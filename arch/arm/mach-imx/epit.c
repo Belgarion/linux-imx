@@ -52,6 +52,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <asm/mach/time.h>
+#include <linux/sched_clock.h>
 
 #include "common.h"
 #include "hardware.h"
@@ -60,6 +61,11 @@ static struct clock_event_device clockevent_epit;
 static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
 
 static void __iomem *timer_base;
+
+static u64 notrace epit_read_sched_clock(void)
+{
+	return __raw_readl(timer_base + EPITCNR);
+}
 
 static inline void epit_irq_disable(void)
 {
@@ -87,6 +93,8 @@ static void epit_irq_acknowledge(void)
 static int __init epit_clocksource_init(struct clk *timer_clk)
 {
 	unsigned int c = clk_get_rate(timer_clk);
+
+	sched_clock_register(epit_read_sched_clock, 32, c);
 
 	return clocksource_mmio_init(timer_base + EPITCNR, "epit", c, 200, 32,
 			clocksource_mmio_readl_down);
@@ -191,6 +199,33 @@ static int __init epit_clockevent_init(struct clk *timer_clk)
 					0x800, 0xfffffffe);
 
 	return 0;
+}
+
+void __init epit_timer_init_clk(void __iomem *base, int irq, struct clk *timer_clk) {
+	if (IS_ERR(timer_clk)) {
+		pr_err("i.MX epit: unable to get clk\n");
+		return;
+	}
+
+	clk_prepare_enable(timer_clk);
+
+	timer_base = base;
+
+	/*
+	 * Initialise to a known state (all timers off, and timing reset)
+	 */
+	__raw_writel(0x0, timer_base + EPITCR);
+
+	__raw_writel(0xffffffff, timer_base + EPITLR);
+	__raw_writel(EPITCR_EN | EPITCR_CLKSRC_REF_HIGH | EPITCR_WAITEN,
+			timer_base + EPITCR);
+
+	/* init and register the timer to the framework */
+	epit_clocksource_init(timer_clk);
+	epit_clockevent_init(timer_clk);
+
+	/* Make irqs happen */
+	setup_irq(irq, &epit_timer_irq);
 }
 
 void __init epit_timer_init(void __iomem *base, int irq)

@@ -606,6 +606,7 @@ config SOC_IMX6SX
 	select IMX_SEMA4
 	select MXC_MLB150
 	select KEYBOARD_SNVS_PWRKEY
+	select HAVE_EPIT
 
 	help
 	  This enables support for Freescale i.MX6 SoloX processor.

@@ -45,6 +45,7 @@ void imx27_soc_init(void);
 void imx31_soc_init(void);
 void imx35_soc_init(void);
 void epit_timer_init(void __iomem *base, int irq);
+void epit_timer_init_clk(void __iomem *base, int irq, struct clk *timer_clk);
 void mxc_timer_init(void __iomem *, int);
 int mx1_clocks_init(unsigned long fref);
 int mx21_clocks_init(unsigned long lref, unsigned long fref);
